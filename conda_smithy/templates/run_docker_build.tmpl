@@ -31,7 +31,7 @@ test -d "$ARTEFACTS" || mkdir "$ARTEFACTS"
 DONE_CANARY="$ARTEFACTS/conda-forge-build-done"
 rm -f "$DONE_CANARY"
 
-cat << EOF > "$ARTEFACTS/conda-forge-build.sh"
+cat << EOF > "$FEEDSTOCK_ROOT/ci_support/build.sh"
 
 export BINSTAR_TOKEN=${BINSTAR_TOKEN}
 export PYTHONUNBUFFERED=1
@@ -61,7 +61,7 @@ docker run -i \
            -v "${FEEDSTOCK_ROOT}":/feedstock_root \
            {{ docker.image }} \
            {{ docker.command }} \
-           /feedstock_root/build_artefacts/conda-forge-build.sh || exit $?
+           /feedstock_root/ci_support/build.sh || exit $?
 
 # check that the end of the script was reached
 test -f "$DONE_CANARY"

@@ -56,7 +56,7 @@ conda build /recipe_root --quiet || exit 1
 touch /feedstock_root/build_artefacts/conda-forge-build-done
 EOF
 
-docker run -i \
+docker run -it \
            -v "${RECIPE_ROOT}":/recipe_root \
            -v "${FEEDSTOCK_ROOT}":/feedstock_root \
            {{ docker.image }} \

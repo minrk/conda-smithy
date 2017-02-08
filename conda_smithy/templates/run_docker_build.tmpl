@@ -33,7 +33,6 @@ rm -f "$DONE_CANARY"
 
 cat << EOF > "$FEEDSTOCK_ROOT/ci_support/build.sh"
 
-export BINSTAR_TOKEN=${BINSTAR_TOKEN}
 export PYTHONUNBUFFERED=1
 
 echo "$config" > ~/.condarc
@@ -46,9 +45,6 @@ conda install --yes --quiet conda-forge-build-setup
 
 {%- block build %}
 conda build /recipe_root --quiet || exit 1
-{%- for owner, channel in channels['targets'] %}
-{{ upload_script }} /recipe_root {{ owner }} --channel={{ channel }} || exit 1
-{%- endfor -%}
 {%- endblock -%}
 
 # signal build-done with a file to protect against
@@ -56,12 +52,46 @@ conda build /recipe_root --quiet || exit 1
 touch /feedstock_root/build_artefacts/conda-forge-build-done
 EOF
 
-docker run -it \
-           -v "${RECIPE_ROOT}":/recipe_root \
-           -v "${FEEDSTOCK_ROOT}":/feedstock_root \
+# Create and run the container in two comamnds,
+# so we have a handle on the container ID
+VOLUMES="-v ${RECIPE_ROOT}:/recipe_root \
+         -v ${FEEDSTOCK_ROOT}:/feedstock_root"
+
+CONTAINER=$(docker create -t \
+           $VOLUMES \
            {{ docker.image }} \
-           {{ docker.command }} \
-           /feedstock_root/ci_support/build.sh || exit $?
+           {{ docker.command }} /feedstock_root/ci_support/build.sh || exit $?)
+
+# build
+docker start -i $CONTAINER || exit 1
+test -f "$DONE_CANARY" || exit 1
+rm -f "$DONE_CANARY"
+
+# commit, so we can run upload in the same environment
+IMAGE=$(docker commit $CONTAINER || exit 1)
+
+# upload with the token passed through stdin
+# FIXME: Should this run if there is no token?
+cat << EOF | docker run --rm -i \
+    $VOLUMES \
+    $IMAGE \
+    {{ docker.command }} || exit $?
+
+export BINSTAR_TOKEN=${BINSTAR_TOKEN}
+
+{%- block test_and_upload %}
+{%- for owner, channel in channels['targets'] %}
+{{ upload_script }} /recipe_root {{ owner }} --channel={{ channel }} || exit 1
+{%- endfor -%}
+{%- endblock %}
 
 # check that the end of the script was reached
-test -f "$DONE_CANARY"
+touch /feedstock_root/build_artefacts/conda-forge-build-done
+EOF
+
+test -f "$DONE_CANARY" || exit 1
+# everything succeeded, remove our container and image
+docker rm -f "$CONTAINER"
+docker rmi "$IMAGE"
+
+echo "done"

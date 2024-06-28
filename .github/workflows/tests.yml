@@ -15,8 +15,15 @@ defaults:
 
 jobs:
   tests:
-    name: tests
+    name: tests-${{ matrix.conda_build }}
     runs-on: "ubuntu-latest"
+    strategy:
+      matrix:
+        include:
+          - conda_build: stable
+          - conda_build: dev
+            # experimental allows failures
+            experimental: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,6 +37,11 @@ jobs:
             python=3.8
             coverage
             coveralls
+
+      - name: install conda-build dev
+        if: ${{ matrix.conda_build == 'dev' }}
+        run: |
+          mamba upgrade -c conda-canary/label/dev conda-build
 
       - name: install conda-smithy
         run: |

@@ -15,12 +15,19 @@ defaults:
 
 jobs:
   tests:
-    name: tests
+    name: tests-conda-build-${{ matrix.conda_build }}
     runs-on: "ubuntu-latest"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - conda_build: stable
+          - conda_build: dev
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Set up Conda env
         uses: mamba-org/setup-micromamba@f8b8a1e23a26f60a44c853292711bacfd3eac822
         with:
@@ -30,6 +37,7 @@ jobs:
             python=3.8
             coverage
             coveralls
+            ${{ matrix.conda_build == 'dev' && '-c conda-canary/label/dev conda-build' || '' }}
 
       - name: install conda-smithy
         run: |
